@@ -8,5 +8,7 @@ print("=======================")
 inventory = 0
 rejected = 0
 
-
+while (True):
+    
+    quantity =input("Please enter a stock quantity or type 'quit' to get your final report: ")
             
