@@ -19,5 +19,10 @@ while (True):
         rejected += 1
 
     else:
-        inventory = inventory + int(quantity)
-        print("You currently have "+ str(inventory)+ " units in your inventory.")
+            if (int(quantity)+inventory>500):
+                 print("Warning! Inventory exceeded 500 units. Please try again.")
+                 break
+            
+            else:
+                inventory = inventory + int(quantity)
+                print("You currently have "+ str(inventory)+ " units in your inventory.")
