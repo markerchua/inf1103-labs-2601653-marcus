@@ -12,3 +12,6 @@ while (True):
     
     quantity =input("Please enter a stock quantity or type 'quit' to get your final report: ")
             
+    if (quantity.isdigit()==False):
+        print("Please give the correct input! We only accept positive digits.")
+        rejected += 1
