@@ -11,7 +11,13 @@ rejected = 0
 while (True):
     
     quantity =input("Please enter a stock quantity or type 'quit' to get your final report: ")
-            
+
+
+    #quantity.isdigit() checks for negative numbers as "-" is not a digit and checks for text
     if (quantity.isdigit()==False):
         print("Please give the correct input! We only accept positive digits.")
         rejected += 1
+
+    else:
+        inventory = inventory + int(quantity)
+        print("You currently have "+ str(inventory)+ " units in your inventory.")
