@@ -14,15 +14,27 @@ while (True):
 
 
     #quantity.isdigit() checks for negative numbers as "-" is not a digit and checks for text
-    if (quantity.isdigit()==False):
+    if(quantity.lower() == "quit"):
+        print("Final Report:")
+        print("Total Units Processed: "+str(inventory))
+        print("Total Rejected/Failed Entries: "+str(rejected))
+        break
+    
+    elif (quantity.isdigit()==False):
         print("Please give the correct input! We only accept positive digits.")
         rejected += 1
+    
+    
+    
+    elif (inventory>500):
+        print("Warning! Inventory exceeded 500 units. Please try again.")
+        break
 
     else:
-            if (int(quantity)+inventory>500):
-                 print("Warning! Inventory exceeded 500 units. Please try again.")
-                 break
+        if (int(quantity)+inventory>500):
+            print("Warning! Inventory exceeded 500 units. Please try again.")
+            break
             
-            else:
-                inventory = inventory + int(quantity)
-                print("You currently have "+ str(inventory)+ " units in your inventory.")
+        else:
+            inventory = inventory + int(quantity)
+            print("You currently have "+ str(inventory)+ " units in your inventory.")
