@@ -13,16 +13,22 @@ history = [] #History Tracking: stores every valid transaction amount entered
 
 #Persistence: load the previously saved inventory. If the file does not exist
 #(e.g. first run), start with an empty inventory instead of crashing.
+#File format - line 1: final total, line 2: transaction history separated by commas
 try:
     with open(INVENTORY_FILE, "r") as file:
-        inventory = int(file.read().strip())
+        lines = file.read().splitlines()
+    inventory = int(lines[0])
+    if (len(lines) > 1 and lines[1] != ""):
+        for amount in lines[1].split(","):
+            history.append(int(amount))
     print("Loaded saved inventory: " + str(inventory) + " units.")
 except FileNotFoundError:
     inventory = 0
     print("No saved inventory found. Starting with an empty inventory.")
-except ValueError:
-    #File exists but does not contain a valid number
+except (ValueError, IndexError):
+    #File exists but is empty or does not contain valid numbers
     inventory = 0
+    history = []
     print("Saved inventory file is invalid. Starting with an empty inventory.")
 
 while (True):
@@ -31,13 +37,20 @@ while (True):
 
     #quantity.isdigit() checks for negative numbers as "-" is not a digit and checks for text
     if(quantity.lower() == "quit"):
-        #Save the inventory so it can be loaded the next time the program starts
+        #Write-Back: save the final total and transaction history so they can be
+        #loaded the next time the program starts
+        history_text = ""
+        for amount in history:
+            if (history_text != ""):
+                history_text += ","
+            history_text += str(amount)
         with open(INVENTORY_FILE, "w") as file:
-            file.write(str(inventory))
+            file.write(str(inventory) + "\n")
+            file.write(history_text + "\n")
         print("Final Report:")
         print("Total Units Processed: "+str(inventory))
         print("Total Rejected/Failed Entries: "+str(rejected))
-        print("Valid Transactions This Session: "+str(history))
+        print("Transaction History: "+str(history))
         print("Inventory saved to " + INVENTORY_FILE)
         break
 
