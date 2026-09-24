@@ -9,6 +9,7 @@ print("=======================")
 print("Smart Inventory Auditor")
 print("=======================")
 rejected = 0
+history = [] #History Tracking: stores every valid transaction amount entered
 
 #Persistence: load the previously saved inventory. If the file does not exist
 #(e.g. first run), start with an empty inventory instead of crashing.
@@ -36,6 +37,7 @@ while (True):
         print("Final Report:")
         print("Total Units Processed: "+str(inventory))
         print("Total Rejected/Failed Entries: "+str(rejected))
+        print("Valid Transactions This Session: "+str(history))
         print("Inventory saved to " + INVENTORY_FILE)
         break
 
@@ -49,4 +51,5 @@ while (True):
 
     else:
         inventory = inventory + int(quantity)
+        history.append(int(quantity))
         print("You currently have "+ str(inventory)+ " units in your inventory.")
