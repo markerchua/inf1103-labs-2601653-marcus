@@ -2,13 +2,44 @@
 #program closes. Furthermore, they need to store a history of all transaction amounts,
 #not just the running total.
 
+import json
+import os
+
 # 1. Data Representation: each inventory item is a dictionary,
-# and all the products are stored together in a list
-inventory = [
-    {"id": "P001", "name": "Laptop", "price": 1200.00, "stock": 15},
-    {"id": "P002", "name": "Mouse", "price": 25.50, "stock": 40},
-    {"id": "P003", "name": "Keyboard", "price": 45.00, "stock": 25},
-]
+# and all the products are stored together in a list, e.g.
+# [{"id": "P001", "name": "Laptop", "price": 1200.00, "stock": 15}, ...]
+# The list is loaded from and saved to inventory.json.
+
+#inventory.json is kept in the same folder as this script, so it is found
+#no matter which folder the program is run from
+INVENTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inventory.json")
+
+
+# 3. Data Persistence: load the inventory list from inventory.json if it exists.
+# Otherwise, begin with an empty inventory.
+def load_inventory():
+    if not os.path.exists(INVENTORY_FILE):
+        print("inventory.json not found.")
+        print("Starting with an empty inventory.")
+        return []
+
+    print("inventory.json found.")
+    try:
+        with open(INVENTORY_FILE, "r") as file:
+            items = json.load(file)
+        print("Inventory loaded successfully.")
+        return items
+    except json.JSONDecodeError:
+        #File exists but does not contain valid JSON
+        print("inventory.json is invalid. Starting with an empty inventory.")
+        return []
+
+
+# Save the inventory list to inventory.json
+def save_inventory(items):
+    with open(INVENTORY_FILE, "w") as file:
+        json.dump(items, file, indent=4)
+    print("Inventory saved successfully to inventory.json.")
 
 
 # Helper: find a product dictionary by its ID (not case-sensitive), or None if not found
@@ -121,6 +152,7 @@ def display_menu():
     print("2. Add Product")
     print("3. Update Stock")
     print("4. Search Product")
+    print("5. Save Inventory")
     print("6. Exit")
     print("----------------------------")
 
@@ -128,6 +160,8 @@ def display_menu():
 print("=" * 40)
 print("INVENTORY MANAGEMENT SYSTEM")
 print("=" * 40)
+print()
+inventory = load_inventory()
 
 while True:
     display_menu()
@@ -143,6 +177,8 @@ while True:
         update_stock(inventory)
     elif option == "4":
         search_product(inventory)
+    elif option == "5":
+        save_inventory(inventory)
     elif option == "6":
         print("Goodbye!")
         break
