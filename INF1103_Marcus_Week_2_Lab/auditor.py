@@ -32,8 +32,8 @@ while (True):
 
     else:
         if (int(quantity)+inventory>500):
-            print("Warning! Inventory exceeded 500 units. Please try again.")
-            break
+                print("Warning! Inventory exceeded 500 units. Please try again.")
+                break
             
         else:
             inventory = inventory + int(quantity)
