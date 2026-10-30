@@ -22,5 +22,11 @@
         "name": "Diapers",
         "price": 15.0,
         "stock": 2
+    },
+    {
+        "id": "803",
+        "name": "Dumbbell",
+        "price": 15.0,
+        "stock": 21
     }
 ]

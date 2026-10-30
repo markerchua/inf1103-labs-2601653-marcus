@@ -30,7 +30,8 @@ class Product:
         self.__price = float(price)     #float
         self.__stock = int(stock)       #int
 
-    #Getters: let other code read the attributes without being able to change them
+    #Gett
+    # ers: let other code read the attributes without being able to change them
     def get_product_id(self):
         return self.__product_id
 
