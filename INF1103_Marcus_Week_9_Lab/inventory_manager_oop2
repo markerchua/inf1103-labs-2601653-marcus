@@ -16,6 +16,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 from abc import ABC, abstractmethod
 from contextlib import redirect_stdout
 
@@ -384,93 +385,138 @@ def display_menu():
     print("----------------------------")
 
 
-# 2.2 Test: create one physical and one digital product, call display_information()
-# on each, and check the output contains the common information from Product
-# and the extra information from the child class.
+# 7. Testing and review: automatic tests for every item in the Lab 7 checklist.
 # Run with:  python inventory_manager_oop2.py test
-def test_product_types():
-    physical = PhysicalProduct("P005", "Guitar", 350.00, 8, 3.5)
-    digital = DigitalProduct("P006", "Operating System", 139.99, 100, 4500)
+# The tests use their own temporary JSON file, so the real inventory.json is never changed.
 
-    tests = [
-        (physical, ["ID: P005", "Name: Guitar", "Price: $350.00", "Stock: 8"], "Weight: 3.50 kg", "physical shipping"),
-        (digital, ["ID: P006", "Name: Operating System", "Price: $139.99", "Stock: 100"], "Download Size: 4500.00 MB", "delivered digitally"),
-    ]
+# Print one PASS/FAIL line and return whether the check passed
+def check(description, passed):
+    print("  " + ("PASS" if passed else "FAIL") + " - " + description)
+    return passed
 
-    all_passed = True
-    for product, common_info, child_info, fulfilment_text in tests:
-        print(type(product).__name__ + " - display_information():")
+
+# Capture everything a product's display_information() prints, so it can be checked
+def get_display_output(product):
+    captured = io.StringIO()
+    with redirect_stdout(captured):
         product.display_information()
+    return captured.getvalue()
 
-        #Capture what display_information() prints so it can be checked
-        captured = io.StringIO()
-        with redirect_stdout(captured):
-            product.display_information()
-        output = captured.getvalue()
 
-        #Common product information comes from the parent class (Product)
-        has_common = True
-        for text in common_info:
-            if text not in output:
-                has_common = False
-        #Additional information comes from the child class
-        has_child = child_info in output
+def run_tests():
+    results = []
+    guitar = PhysicalProduct("P005", "Guitar", 350.00, 8, 3.5)
+    operating_system = DigitalProduct("P006", "Operating System", 139.99, 100, 4500)
 
-        print("  Common info from Product:      " + ("PASS" if has_common else "FAIL"))
-        print("  Extra info from " + type(product).__name__ + ": " + ("PASS" if has_child else "FAIL"))
-
-        #3.2 Test: each subclass returns its own fulfilment message
-        fulfilment = product.get_fulfilment_info()
-        has_fulfilment = fulfilment_text in fulfilment
-        print("  get_fulfilment_info(): " + fulfilment)
-        print("  Correct fulfilment message:    " + ("PASS" if has_fulfilment else "FAIL"))
-        print()
-        if not (has_common and has_child and has_fulfilment):
-            all_passed = False
-
-    #3.3 Test: try to create a Product directly. Product is abstract and its
-    #get_fulfilment_info() is unimplemented, so Python should refuse with a TypeError.
-    print("Creating a Product directly:")
-    try:
-        Product("P001", "Laptop", 1200.00, 15)
-        print("  Product was created - FAIL (Product should be abstract)")
-        all_passed = False
-    except TypeError as error:
-        print("  TypeError: " + str(error))
-        print("  Product cannot be instantiated: PASS")
+    # 1. Physical products store and display their weights
+    print("1. Physical products store and display their weights")
+    guitar.display_information()
+    output = get_display_output(guitar)
+    results.append(check("weight is stored (3.5 kg)", guitar.get_weight() == 3.5))
+    results.append(check("common info comes from Product", "ID: P005 | Name: Guitar | Price: $350.00 | Stock: 8" in output))
+    results.append(check("weight is displayed", "Weight: 3.50 kg" in output))
     print()
 
-    #4.2 Test: physical products of different weights calculate their shipping cost
-    #(rule: $5.00 base fee + $2.00 per kg)
-    print("Shipping costs for physical products:")
+    # 2. Digital products store and display their download sizes
+    print("2. Digital products store and display their download sizes")
+    operating_system.display_information()
+    output = get_display_output(operating_system)
+    results.append(check("download size is stored (4500 MB)", operating_system.get_download_size() == 4500))
+    results.append(check("common info comes from Product", "ID: P006 | Name: Operating System | Price: $139.99 | Stock: 100" in output))
+    results.append(check("download size is displayed", "Download Size: 4500.00 MB" in output))
+    print()
+
+    # 3. Both subclasses implement get_fulfilment_info()
+    print("3. Both subclasses implement get_fulfilment_info()")
+    print("  " + guitar.get_fulfilment_info())
+    print("  " + operating_system.get_fulfilment_info())
+    results.append(check("PhysicalProduct requires physical shipping", "physical shipping" in guitar.get_fulfilment_info()))
+    results.append(check("DigitalProduct is delivered digitally", "delivered digitally" in operating_system.get_fulfilment_info()))
+    print()
+
+    # 4. The abstract Product class cannot be instantiated directly
+    print("4. The abstract Product class cannot be instantiated directly")
+    try:
+        Product("P001", "Laptop", 1200.00, 15)
+        results.append(check("Product cannot be created", False))
+    except TypeError as error:
+        print("  TypeError: " + str(error))
+        results.append(check("Product cannot be created", True))
+    print()
+
+    # 5. Physical products can calculate shipping costs ($5.00 base fee + $2.00 per kg)
+    print("5. Physical products can calculate shipping costs")
     shipping_tests = [
         (PhysicalProduct("P007", "Headphones", 89.00, 20, 0.5), 6.00),
-        (PhysicalProduct("P005", "Guitar", 350.00, 8, 3.5), 12.00),
+        (guitar, 12.00),
         (PhysicalProduct("P008", "Amplifier", 499.00, 4, 20), 45.00),
     ]
     for product, expected_cost in shipping_tests:
         cost = product.calculate_shipping_cost()
-        passed = abs(cost - expected_cost) < 0.001
-        print("  " + product.get_name() + " (" + format(product.get_weight(), ".2f") + " kg): $" + format(cost, ".2f") + " - " + ("PASS" if passed else "FAIL"))
-        if not passed:
-            all_passed = False
-
-    #Physical products sign the CanBeShipped contract, digital products do not
-    physical_shippable = isinstance(physical, CanBeShipped)
-    digital_shippable = isinstance(digital, CanBeShipped)
-    print("  PhysicalProduct implements CanBeShipped:  " + ("PASS" if physical_shippable else "FAIL"))
-    print("  DigitalProduct does not implement it:     " + ("PASS" if not digital_shippable else "FAIL"))
-    if not physical_shippable or digital_shippable:
-        all_passed = False
+        description = product.get_name() + " (" + format(product.get_weight(), ".2f") + " kg) costs $" + format(cost, ".2f") + " to ship"
+        results.append(check(description, abs(cost - expected_cost) < 0.001))
+    results.append(check("PhysicalProduct implements CanBeShipped", isinstance(guitar, CanBeShipped)))
     print()
 
-    print("All tests passed!" if all_passed else "Some tests FAILED.")
+    # 6. Digital products are not required to implement shipping behaviour
+    print("6. Digital products are not required to implement shipping behaviour")
+    results.append(check("DigitalProduct does not implement CanBeShipped", not isinstance(operating_system, CanBeShipped)))
+    results.append(check("DigitalProduct has no calculate_shipping_cost()", not hasattr(operating_system, "calculate_shipping_cost")))
+    results.append(check("DigitalProduct can still be created", isinstance(operating_system, Product)))
+    print()
+
+    # 7. Inventory operations continue to work
+    print("7. Inventory operations continue to work")
+    inventory = Inventory()
+    results.append(check("add a physical product", inventory.add_product(guitar)))
+    results.append(check("add a digital product", inventory.add_product(operating_system)))
+    results.append(check("duplicate product ID is rejected", not inventory.add_product(PhysicalProduct("p005", "Other", 1, 1, 1))))
+    results.append(check("search finds a product (not case-sensitive)", inventory.search_product("p006") is operating_system))
+    results.append(check("search returns None for an unknown ID", inventory.search_product("P999") is None))
+    results.append(check("update stock to 50", guitar.update_stock(50) and guitar.get_stock() == 50))
+    results.append(check("negative stock is rejected", not guitar.update_stock(-5) and guitar.get_stock() == 50))
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        inventory.display_all()
+    output = captured.getvalue()
+    results.append(check("display all shows both products with their extra info", "Weight: 3.50 kg" in output and "Download Size: 4500.00 MB" in output))
+    print()
+
+    # 8. JSON saving and loading preserve the correct product types
+    print("8. JSON saving and loading preserve the correct product types")
+    global INVENTORY_FILE
+    real_file = INVENTORY_FILE
+    INVENTORY_FILE = os.path.join(tempfile.mkdtemp(), "test_inventory.json")
+    try:
+        save_inventory(inventory)
+        with open(INVENTORY_FILE, "r") as file:
+            saved = json.load(file)
+        results.append(check("saved file has a \"type\" for each product", [item["type"] for item in saved] == ["physical", "digital"]))
+        results.append(check("saved file has weight and download_size", saved[0]["weight"] == 3.5 and saved[1]["download_size"] == 4500))
+
+        with redirect_stdout(io.StringIO()):
+            loaded = load_inventory()
+        loaded_guitar = loaded.search_product("P005")
+        loaded_os = loaded.search_product("P006")
+        results.append(check("Guitar is loaded back as a PhysicalProduct", type(loaded_guitar) == PhysicalProduct))
+        results.append(check("Operating System is loaded back as a DigitalProduct", type(loaded_os) == DigitalProduct))
+        results.append(check("weight and updated stock are restored", loaded_guitar.get_weight() == 3.5 and loaded_guitar.get_stock() == 50))
+        results.append(check("download size is restored", loaded_os.get_download_size() == 4500))
+    finally:
+        os.remove(INVENTORY_FILE)
+        os.rmdir(os.path.dirname(INVENTORY_FILE))
+        INVENTORY_FILE = real_file
+    print()
+
+    passed = results.count(True)
+    print(str(passed) + " of " + str(len(results)) + " tests passed.")
+    print("All tests passed!" if passed == len(results) else "Some tests FAILED.")
 
 
 # Main Program
 #Running "python inventory_manager_oop2.py test" runs the tests instead of the menu
 if len(sys.argv) > 1 and sys.argv[1] == "test":
-    test_product_types()
+    run_tests()
     sys.exit()
 
 print("=" * 40)
