@@ -87,7 +87,14 @@ class CanBeShipped(ABC):
 #PhysicalProduct class
 #Inheritance: a PhysicalProduct 'is-a' Product, so it inherits all of Product's
 #attributes and methods, and adds what is unique to a physical item - its weight.
-class PhysicalProduct(Product):
+#Interface: a PhysicalProduct also 'must be able to' be shipped, so it implements
+#CanBeShipped. This is still single class inheritance - Product is its only parent
+#class, and CanBeShipped is an interface (contract), not a second parent class.
+class PhysicalProduct(Product, CanBeShipped):
+
+    #Shipping rule: a base fee plus a charge for every kilogram
+    BASE_SHIPPING_FEE = 5.00   #$ per parcel
+    SHIPPING_RATE_PER_KG = 2.00   #$ per kg
 
     #Reuse the Product constructor with super() to set up the ID, name, price and stock,
     #then initialise the extra weight attribute
@@ -108,6 +115,10 @@ class PhysicalProduct(Product):
     #Implements Product's abstract method: physical products are shipped
     def get_fulfilment_info(self):
         return self.get_name() + " requires physical shipping to the customer."
+
+    #Implements CanBeShipped's abstract method: shipping is based on the product's weight
+    def calculate_shipping_cost(self):
+        return self.BASE_SHIPPING_FEE + self.__weight * self.SHIPPING_RATE_PER_KG
 
 
 #DigitalProduct class
@@ -381,6 +392,30 @@ def test_product_types():
     except TypeError as error:
         print("  TypeError: " + str(error))
         print("  Product cannot be instantiated: PASS")
+    print()
+
+    #4.2 Test: physical products of different weights calculate their shipping cost
+    #(rule: $5.00 base fee + $2.00 per kg)
+    print("Shipping costs for physical products:")
+    shipping_tests = [
+        (PhysicalProduct("P007", "Headphones", 89.00, 20, 0.5), 6.00),
+        (PhysicalProduct("P005", "Guitar", 350.00, 8, 3.5), 12.00),
+        (PhysicalProduct("P008", "Amplifier", 499.00, 4, 20), 45.00),
+    ]
+    for product, expected_cost in shipping_tests:
+        cost = product.calculate_shipping_cost()
+        passed = abs(cost - expected_cost) < 0.001
+        print("  " + product.get_name() + " (" + format(product.get_weight(), ".2f") + " kg): $" + format(cost, ".2f") + " - " + ("PASS" if passed else "FAIL"))
+        if not passed:
+            all_passed = False
+
+    #Physical products sign the CanBeShipped contract, digital products do not
+    physical_shippable = isinstance(physical, CanBeShipped)
+    digital_shippable = isinstance(digital, CanBeShipped)
+    print("  PhysicalProduct implements CanBeShipped:  " + ("PASS" if physical_shippable else "FAIL"))
+    print("  DigitalProduct does not implement it:     " + ("PASS" if not digital_shippable else "FAIL"))
+    if not physical_shippable or digital_shippable:
+        all_passed = False
     print()
 
     print("All tests passed!" if all_passed else "Some tests FAILED.")
