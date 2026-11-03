@@ -12,6 +12,7 @@ import io
 import json
 import os
 import sys
+from abc import ABC, abstractmethod
 from contextlib import redirect_stdout
 
 #inventory.json is kept in the same folder as this script, so it is found
@@ -22,7 +23,10 @@ INVENTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inven
 #Product class
 #SRP: the Product class has one responsibility - represent and manage a single product.
 #It does NOT load/save files, ask the user for input, show the menu or manage the inventory.
-class Product:
+#Abstract class: Product inherits from ABC and has an abstract method, so a generic
+#Product can never be created directly - every product must be a PhysicalProduct or
+#a DigitalProduct.
+class Product(ABC):
 
     #Initializer (constructor): the parameters are the values passed in from outside,
     #the self.__ attributes belong to this object. The double underscore marks them as
@@ -59,6 +63,12 @@ class Product:
     #Display this product's information on one line
     def display_information(self):
         print("ID: " + self.__product_id + " | Name: " + self.__name + " | Price: $" + format(self.__price, ".2f") + " | Stock: " + str(self.__stock))
+
+    #Abstract method: no implementation here. Every subclass must provide its own
+    #get_fulfilment_info() explaining how that type of product reaches the customer.
+    @abstractmethod
+    def get_fulfilment_info(self):
+        pass
 
 
 #PhysicalProduct class
