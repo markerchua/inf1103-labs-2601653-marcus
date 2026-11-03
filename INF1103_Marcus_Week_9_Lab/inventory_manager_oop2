@@ -92,6 +92,10 @@ class PhysicalProduct(Product):
         super().display_information()
         print("      Weight: " + format(self.__weight, ".2f") + " kg")
 
+    #Implements Product's abstract method: physical products are shipped
+    def get_fulfilment_info(self):
+        return self.get_name() + " requires physical shipping to the customer."
+
 
 #DigitalProduct class
 #Inheritance: a DigitalProduct 'is-a' Product, so it inherits all of Product's
@@ -113,6 +117,10 @@ class DigitalProduct(Product):
     def display_information(self):
         super().display_information()
         print("      Download Size: " + format(self.__download_size, ".2f") + " MB")
+
+    #Implements Product's abstract method: digital products are delivered digitally
+    def get_fulfilment_info(self):
+        return self.get_name() + " is delivered digitally via a download link."
 
 
 #Inventory class
@@ -315,12 +323,12 @@ def test_product_types():
     digital = DigitalProduct("P006", "Operating System", 139.99, 100, 4500)
 
     tests = [
-        (physical, ["ID: P005", "Name: Guitar", "Price: $350.00", "Stock: 8"], "Weight: 3.50 kg"),
-        (digital, ["ID: P006", "Name: Operating System", "Price: $139.99", "Stock: 100"], "Download Size: 4500.00 MB"),
+        (physical, ["ID: P005", "Name: Guitar", "Price: $350.00", "Stock: 8"], "Weight: 3.50 kg", "physical shipping"),
+        (digital, ["ID: P006", "Name: Operating System", "Price: $139.99", "Stock: 100"], "Download Size: 4500.00 MB", "delivered digitally"),
     ]
 
     all_passed = True
-    for product, common_info, child_info in tests:
+    for product, common_info, child_info, fulfilment_text in tests:
         print(type(product).__name__ + " - display_information():")
         product.display_information()
 
@@ -340,8 +348,14 @@ def test_product_types():
 
         print("  Common info from Product:      " + ("PASS" if has_common else "FAIL"))
         print("  Extra info from " + type(product).__name__ + ": " + ("PASS" if has_child else "FAIL"))
+
+        #3.2 Test: each subclass returns its own fulfilment message
+        fulfilment = product.get_fulfilment_info()
+        has_fulfilment = fulfilment_text in fulfilment
+        print("  get_fulfilment_info(): " + fulfilment)
+        print("  Correct fulfilment message:    " + ("PASS" if has_fulfilment else "FAIL"))
         print()
-        if not (has_common and has_child):
+        if not (has_common and has_child and has_fulfilment):
             all_passed = False
 
     print("All tests passed!" if all_passed else "Some tests FAILED.")
