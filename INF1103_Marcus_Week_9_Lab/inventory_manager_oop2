@@ -8,8 +8,11 @@
 #  File Handling - load_inventory() and save_inventory() load/save inventory.json
 #  Main Program  - displays the menu, gets user input and calls Inventory methods
 
+import io
 import json
 import os
+import sys
+from contextlib import redirect_stdout
 
 #inventory.json is kept in the same folder as this script, so it is found
 #no matter which folder the program is run from
@@ -293,7 +296,53 @@ def display_menu():
     print("----------------------------")
 
 
+# 2.2 Test: create one physical and one digital product, call display_information()
+# on each, and check the output contains the common information from Product
+# and the extra information from the child class.
+# Run with:  python inventory_manager_oop2.py test
+def test_product_types():
+    physical = PhysicalProduct("P005", "Guitar", 350.00, 8, 3.5)
+    digital = DigitalProduct("P006", "Operating System", 139.99, 100, 4500)
+
+    tests = [
+        (physical, ["ID: P005", "Name: Guitar", "Price: $350.00", "Stock: 8"], "Weight: 3.50 kg"),
+        (digital, ["ID: P006", "Name: Operating System", "Price: $139.99", "Stock: 100"], "Download Size: 4500.00 MB"),
+    ]
+
+    all_passed = True
+    for product, common_info, child_info in tests:
+        print(type(product).__name__ + " - display_information():")
+        product.display_information()
+
+        #Capture what display_information() prints so it can be checked
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            product.display_information()
+        output = captured.getvalue()
+
+        #Common product information comes from the parent class (Product)
+        has_common = True
+        for text in common_info:
+            if text not in output:
+                has_common = False
+        #Additional information comes from the child class
+        has_child = child_info in output
+
+        print("  Common info from Product:      " + ("PASS" if has_common else "FAIL"))
+        print("  Extra info from " + type(product).__name__ + ": " + ("PASS" if has_child else "FAIL"))
+        print()
+        if not (has_common and has_child):
+            all_passed = False
+
+    print("All tests passed!" if all_passed else "Some tests FAILED.")
+
+
 # Main Program
+#Running "python inventory_manager_oop2.py test" runs the tests instead of the menu
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    test_product_types()
+    sys.exit()
+
 print("=" * 40)
 print("INVENTORY MANAGEMENT SYSTEM")
 print("=" * 40)
