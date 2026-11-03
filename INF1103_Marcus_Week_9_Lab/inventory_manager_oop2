@@ -72,10 +72,12 @@ class PhysicalProduct(Product):
     def get_weight(self):
         return self.__weight
 
-    #Display the product's existing information alongside its weight.
-    #Product's attributes are private, so they are read through the inherited getters.
+    #Method overriding: replaces Product's display_information() for physical products.
+    #super() lets the parent display the common product information, then the child
+    #only adds the part that is unique to it - the weight.
     def display_information(self):
-        print("ID: " + self.get_product_id() + " | Name: " + self.get_name() + " | Price: $" + format(self.get_price(), ".2f") + " | Stock: " + str(self.get_stock()) + " | Weight: " + format(self.__weight, ".2f") + " kg")
+        super().display_information()
+        print("      Weight: " + format(self.__weight, ".2f") + " kg")
 
 
 #DigitalProduct class
@@ -92,10 +94,12 @@ class DigitalProduct(Product):
     def get_download_size(self):
         return self.__download_size
 
-    #Display the product's existing information alongside its download size.
-    #Product's attributes are private, so they are read through the inherited getters.
+    #Method overriding: replaces Product's display_information() for digital products.
+    #super() lets the parent display the common product information, then the child
+    #only adds the part that is unique to it - the download size.
     def display_information(self):
-        print("ID: " + self.get_product_id() + " | Name: " + self.get_name() + " | Price: $" + format(self.get_price(), ".2f") + " | Stock: " + str(self.get_stock()) + " | Download Size: " + format(self.__download_size, ".2f") + " MB")
+        super().display_information()
+        print("      Download Size: " + format(self.__download_size, ".2f") + " MB")
 
 
 #Inventory class
