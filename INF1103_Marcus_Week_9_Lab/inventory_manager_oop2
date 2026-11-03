@@ -358,6 +358,18 @@ def test_product_types():
         if not (has_common and has_child and has_fulfilment):
             all_passed = False
 
+    #3.3 Test: try to create a Product directly. Product is abstract and its
+    #get_fulfilment_info() is unimplemented, so Python should refuse with a TypeError.
+    print("Creating a Product directly:")
+    try:
+        Product("P001", "Laptop", 1200.00, 15)
+        print("  Product was created - FAIL (Product should be abstract)")
+        all_passed = False
+    except TypeError as error:
+        print("  TypeError: " + str(error))
+        print("  Product cannot be instantiated: PASS")
+    print()
+
     print("All tests passed!" if all_passed else "Some tests FAILED.")
 
 
