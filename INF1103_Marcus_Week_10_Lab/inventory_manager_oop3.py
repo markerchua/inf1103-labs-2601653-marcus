@@ -480,6 +480,74 @@ def test_order_composition() -> list[bool]:
     return results
 
 
+# Lab 8 - 6.2: works with ANY Product, using only behaviour every Product must support.
+# It never checks whether the product is a PhysicalProduct or DigitalProduct - the
+# object itself decides which display_information()/get_fulfilment_info() runs.
+def show_product_details(product: Product) -> None:
+    product.display_information()
+    print(product.get_fulfilment_info())
+
+
+# Lab 8 - 6: test that PhysicalProduct and DigitalProduct can stand in for Product
+def test_liskov_substitution() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S040", "Tech Hub", "sales@techhub.com")
+    monitor = PhysicalProduct("P040", "Monitor", 249.00, 10, supplier, 4.2)
+    antivirus = DigitalProduct("P041", "Antivirus Licence", 49.99, 200, supplier, 350)
+
+    #6.2 Call the SAME function with both subclasses - no changes to the function
+    print("show_product_details() with a PhysicalProduct:")
+    show_product_details(monitor)
+    print("show_product_details() with a DigitalProduct:")
+    show_product_details(antivirus)
+    for product in [monitor, antivirus]:
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            show_product_details(product)
+        results.append(check("show_product_details() works with a " + type(product).__name__, product.get_fulfilment_info() in captured.getvalue()))
+
+    #6.2 Both types can be added to an Inventory and used by its normal operations
+    inventory = Inventory()
+    results.append(check("both product types can be added to the same Inventory", inventory.add_product(monitor) and inventory.add_product(antivirus)))
+    results.append(check("find_product() returns either product type", inventory.find_product("P040") is monitor and inventory.find_product("P041") is antivirus))
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        inventory.display_all()
+    results.append(check("display_all() shows each product with its own details", "Weight: 4.20 kg" in captured.getvalue() and "Download Size: 350.00 MB" in captured.getvalue()))
+    results.append(check("remove_product() works for either product type", inventory.remove_product("P041") is antivirus and inventory.remove_product("P040") is monitor))
+
+    #6.3 Expectation established by Product: update_stock(quantity) accepts any whole
+    #number of 0 or more and returns True, rejects anything else and returns False
+    #without changing the stock, and get_stock() then returns the new value.
+    #Both subclasses inherit update_stock() WITHOUT overriding it, so they keep this meaning.
+    print("6.3 Product expectation: update_stock() means the same for every Product")
+    for product in [monitor, antivirus]:
+        name = type(product).__name__
+        accepted = product.update_stock(25) is True and product.get_stock() == 25
+        accepted_zero = product.update_stock(0) is True and product.get_stock() == 0
+        rejected = product.update_stock(-3) is False and product.update_stock(2.5) is False and product.get_stock() == 0
+        results.append(check(name + " accepts valid stock (25 and 0) and returns True", accepted and accepted_zero))
+        results.append(check(name + " rejects invalid stock (-3, 2.5), returns False and keeps its stock", rejected))
+        results.append(check(name + " get_fulfilment_info() returns a String, as Product promises", type(product.get_fulfilment_info()) == str))
+
+    #6.3 Diagnose: the teammate's proposed DigitalProduct breaks the expectation above.
+    #It is only defined here to show WHY it violates LSP - it is not used in the system.
+    class ProposedDigitalProduct(DigitalProduct):
+        def update_stock(self, quantity: int) -> None:
+            raise NotImplementedError("Digital products have no stock")
+
+    proposed = ProposedDigitalProduct("P042", "Ebook", 9.99, 100, supplier, 5)
+    try:
+        #Code written for Product - it has no reason to expect an error here
+        proposed.update_stock(50)
+        broke = False
+    except NotImplementedError as error:
+        print("  Teammate's DigitalProduct: NotImplementedError: " + str(error))
+        broke = True
+    results.append(check("the teammate's DigitalProduct breaks code that uses Product (violates LSP)", broke))
+    return results
+
+
 # Lab 8 - 5.2: check every method of every class has type hints on all of its
 # parameters (except self) and on its return value, and that Any is never used.
 # Python does not enforce type hints, so this test checks that they are WRITTEN.
@@ -630,6 +698,11 @@ def run_tests() -> None:
     # Lab 8 - 4.3 Order and OrderLine composition
     print("Lab 8 - 4.3 Order and OrderLine composition")
     results.extend(test_order_composition())
+    print()
+
+    # Lab 8 - 6 Liskov Substitution Principle
+    print("Lab 8 - 6 Liskov Substitution Principle (LSP)")
+    results.extend(test_liskov_substitution())
     print()
 
     # Lab 8 - 5.2 Review all type decisions
