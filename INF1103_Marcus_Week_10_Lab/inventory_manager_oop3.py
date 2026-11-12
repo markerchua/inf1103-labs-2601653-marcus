@@ -29,6 +29,7 @@ from can_be_shipped import CanBeShipped
 from physical_product import PhysicalProduct
 from digital_product import DigitalProduct
 from inventory import Inventory
+from order import Order
 
 #inventory.json is kept in the same folder as this script, so it is found
 #no matter which folder the program is run from
@@ -411,6 +412,67 @@ def test_inventory_aggregation():
     return results
 
 
+# Lab 8 - 4.3: test the composition between Order and OrderLine
+def test_order_composition():
+    results = []
+    supplier = Supplier("S030", "Studio Gear", "hello@studiogear.com")
+    microphone = PhysicalProduct("P030", "Microphone", 120.00, 15, supplier, 0.6)
+    recording_software = DigitalProduct("P031", "Recording Software", 199.00, 50, supplier, 1200)
+    cable = PhysicalProduct("P032", "XLR Cable", 15.50, 40, supplier, 0.3)
+
+    #The Products also sit in an Inventory - the Orders will only REFER to them
+    inventory = Inventory()
+    for product in [microphone, recording_software, cable]:
+        inventory.add_product(product)
+
+    #Create an Order and add products with add_order_line().
+    #Only a Product and a quantity are passed in - the Order creates each OrderLine itself.
+    order_1 = Order("O001")
+    order_1.add_order_line(microphone, 2)           #2 x $120.00 = $240.00
+    order_1.add_order_line(recording_software, 1)   #1 x $199.00 = $199.00
+    order_1.add_order_line(cable, 4)                #4 x $15.50  = $62.00
+    print("Order 1 with its order lines and total:")
+    order_1.display_information()
+    results.append(check("the Order created one OrderLine per add_order_line() call", len(order_1.get_order_lines()) == 3))
+    results.append(check("the Order calculates its total from its OrderLines ($501.00)", abs(order_1.calculate_total() - 501.00) < 0.001))
+    results.append(check("the total equals the sum of each OrderLine's subtotal", abs(order_1.calculate_total() - sum(line.calculate_subtotal() for line in order_1.get_order_lines())) < 0.001))
+
+    #OrderLine refers to the Product but does not own it
+    line_1 = order_1.get_order_lines()[0]
+    results.append(check("an OrderLine refers to the SAME Product object (not a copy)", line_1.get_product() is microphone))
+    results.append(check("that Product is still in the Inventory as well", inventory.find_product("P030") is microphone))
+
+    #Predict first: add the same Product to a different Order.
+    #Each Order creates its OWN OrderLine, so there are 2 OrderLine objects,
+    #but both refer to the 1 same Product object.
+    order_2 = Order("O002")
+    order_2.add_order_line(microphone, 1)
+    print("Order 2 with the same Microphone:")
+    order_2.display_information()
+    line_2 = order_2.get_order_lines()[0]
+    print("OrderLine in Order 1: id = " + str(id(line_1)) + " -> Product id = " + str(id(line_1.get_product())))
+    print("OrderLine in Order 2: id = " + str(id(line_2)) + " -> Product id = " + str(id(line_2.get_product())))
+    results.append(check("each Order created its own OrderLine (2 different OrderLine objects)", line_1 is not line_2))
+    results.append(check("both OrderLines refer to the same 1 Product object", line_1.get_product() is line_2.get_product() is microphone))
+    results.append(check("each OrderLine keeps its own quantity (2 and 1)", line_1.get_quantity() == 2 and line_2.get_quantity() == 1))
+
+    #Remove an order line through an Order method
+    results.append(check("remove_order_line() removes the XLR Cable line from Order 1", order_1.remove_order_line("p032")))
+    results.append(check("removing a product that is not in the order returns False", not order_1.remove_order_line("P999")))
+    print("Order 1 after removing the XLR Cable line:")
+    order_1.display_information()
+    results.append(check("Order 1 now has 2 lines and a total of $439.00", len(order_1.get_order_lines()) == 2 and abs(order_1.calculate_total() - 439.00) < 0.001))
+    results.append(check("removing the order line did NOT remove the Product from the Inventory", inventory.find_product("P032") is cable))
+    results.append(check("Order 2 is not affected by changes to Order 1", len(order_2.get_order_lines()) == 1))
+
+    #Remove a whole Order from the scenario: its OrderLines go with it,
+    #but the Products and the other Order are not affected
+    del order_1
+    results.append(check("after Order 1 is deleted, the Products still exist in the Inventory", inventory.find_product("P030") is microphone and inventory.find_product("P031") is recording_software))
+    results.append(check("after Order 1 is deleted, Order 2 still has its own OrderLine", order_2.get_order_lines()[0].get_product() is microphone))
+    return results
+
+
 def run_tests():
     results = []
     music_supplier = Supplier("S001", "Acme Music Supplies", "sales@acmemusic.com")
@@ -528,6 +590,11 @@ def run_tests():
     # Lab 8 - 3.2 Inventory and Product aggregation
     print("Lab 8 - 3.2 Inventory and Product aggregation")
     results.extend(test_inventory_aggregation())
+    print()
+
+    # Lab 8 - 4.3 Order and OrderLine composition
+    print("Lab 8 - 4.3 Order and OrderLine composition")
+    results.extend(test_order_composition())
     print()
 
     passed = results.count(True)

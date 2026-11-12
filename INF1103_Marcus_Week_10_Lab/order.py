@@ -32,6 +32,17 @@ class Order:
         order_line = OrderLine(product, quantity)
         self.__order_lines.append(order_line)
 
+    #Remove an order line through the Order itself - the Order manages its own lines.
+    #The OrderLine is discarded with it (it is not returned to be reused or moved to
+    #another Order), but the Product it referred to is NOT affected.
+    #Returns True if a line for that product ID was removed, False if none was found.
+    def remove_order_line(self, product_id: str) -> bool:
+        for order_line in self.__order_lines:
+            if order_line.get_product().get_product_id().upper() == product_id.upper():
+                self.__order_lines.remove(order_line)
+                return True
+        return False
+
     #Total value of the order: ask each OrderLine to calculate its own subtotal
     #and add them together
     def calculate_total(self) -> float:
