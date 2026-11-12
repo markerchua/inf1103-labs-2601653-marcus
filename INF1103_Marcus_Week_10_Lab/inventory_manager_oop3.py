@@ -548,6 +548,41 @@ def test_liskov_substitution() -> list[bool]:
     return results
 
 
+# Lab 8 - 7.2: demonstrate polymorphism through the common Product type
+def test_polymorphism() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S050", "Home Office Co", "support@homeoffice.com")
+
+    #At least one PhysicalProduct and one DigitalProduct in the SAME Inventory
+    inventory = Inventory()
+    inventory.add_product(PhysicalProduct("P050", "Office Chair", 189.00, 6, supplier, 12.5))
+    inventory.add_product(DigitalProduct("P051", "Office Suite", 99.00, 300, supplier, 2800))
+    inventory.add_product(PhysicalProduct("P052", "Desk Lamp", 39.90, 25, supplier, 1.2))
+
+    #What each product SHOULD produce - used only to check the output afterwards
+    expected = {
+        "P050": ("Weight: 12.50 kg", "Office Chair requires physical shipping to the customer."),
+        "P051": ("Download Size: 2800.00 MB", "Office Suite is delivered digitally via a download link."),
+        "P052": ("Weight: 1.20 kg", "Desk Lamp requires physical shipping to the customer."),
+    }
+
+    #7.1 / 7.2: ONE loop over the Product collection. No separate loops for each type
+    #and no isinstance() - each call is dispatched to the object's own implementation.
+    product: Product
+    for product in inventory.get_products():
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            product.display_information()
+            print(product.get_fulfilment_info())
+        output = captured.getvalue()
+        print(output, end="")
+
+        extra_detail, fulfilment = expected[product.get_product_id()]
+        results.append(check(product.get_name() + " ran its own display_information() (" + extra_detail + ")", extra_detail in output))
+        results.append(check(product.get_name() + " ran its own get_fulfilment_info()", fulfilment in output))
+    return results
+
+
 # Lab 8 - 5.2: check every method of every class has type hints on all of its
 # parameters (except self) and on its return value, and that Any is never used.
 # Python does not enforce type hints, so this test checks that they are WRITTEN.
@@ -703,6 +738,11 @@ def run_tests() -> None:
     # Lab 8 - 6 Liskov Substitution Principle
     print("Lab 8 - 6 Liskov Substitution Principle (LSP)")
     results.extend(test_liskov_substitution())
+    print()
+
+    # Lab 8 - 7 Polymorphism
+    print("Lab 8 - 7 Polymorphism through the Product type")
+    results.extend(test_polymorphism())
     print()
 
     # Lab 8 - 5.2 Review all type decisions
