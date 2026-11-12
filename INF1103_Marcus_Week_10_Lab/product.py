@@ -27,16 +27,16 @@ class Product(ABC):
         self.__supplier: Supplier = supplier   #reference to an existing Supplier object
 
     #Getters: let other code read the attributes without being able to change them
-    def get_product_id(self):
+    def get_product_id(self) -> str:
         return self.__product_id
 
-    def get_name(self):
+    def get_name(self) -> str:
         return self.__name
 
-    def get_price(self):
+    def get_price(self) -> float:
         return self.__price
 
-    def get_stock(self):
+    def get_stock(self) -> int:
         return self.__stock
 
     #Returns the Supplier object itself, so its information can be accessed when required
@@ -46,7 +46,7 @@ class Product(ABC):
     #Encapsulation: the stock can only be changed through this method, so the Product
     #decides whether the new value is allowed before assigning it to self.__stock.
     #Returns True if the stock was updated, False if the quantity was rejected.
-    def update_stock(self, quantity):
+    def update_stock(self, quantity: int) -> bool:
         if type(quantity) != int or quantity < 0:
             return False
         self.__stock = quantity
@@ -54,12 +54,12 @@ class Product(ABC):
 
     #Display this product's information, including who supplies it.
     #The supplier's details are read through the stored Supplier reference.
-    def display_information(self):
+    def display_information(self) -> None:
         print("ID: " + self.__product_id + " | Name: " + self.__name + " | Price: $" + format(self.__price, ".2f") + " | Stock: " + str(self.__stock))
         print("      Supplier: " + self.__supplier.get_name() + " (" + self.__supplier.get_supplier_id() + ")")
 
     #Abstract method: no implementation here. Every subclass must provide its own
     #get_fulfilment_info() explaining how that type of product reaches the customer.
     @abstractmethod
-    def get_fulfilment_info(self):
+    def get_fulfilment_info(self) -> str:
         pass

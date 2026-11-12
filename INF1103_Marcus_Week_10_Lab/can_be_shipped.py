@@ -10,5 +10,5 @@ class CanBeShipped(ABC):
 
     #Implementing classes must provide a way to calculate shipping costs
     @abstractmethod
-    def calculate_shipping_cost(self):
+    def calculate_shipping_cost(self) -> float:
         pass

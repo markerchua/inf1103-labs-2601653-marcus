@@ -11,18 +11,18 @@ class DigitalProduct(Product):
     #supplier, then initialise the extra download_size attribute
     def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier, download_size: float) -> None:
         super().__init__(product_id, name, price, stock, supplier)
-        self.__download_size = float(download_size)   #float, in megabytes
+        self.__download_size: float = float(download_size)   #in megabytes
 
-    def get_download_size(self):
+    def get_download_size(self) -> float:
         return self.__download_size
 
     #Method overriding: replaces Product's display_information() for digital products.
     #super() lets the parent display the common product information, then the child
     #only adds the part that is unique to it - the download size.
-    def display_information(self):
+    def display_information(self) -> None:
         super().display_information()
         print("      Download Size: " + format(self.__download_size, ".2f") + " MB")
 
     #Implements Product's abstract method: digital products are delivered digitally
-    def get_fulfilment_info(self):
+    def get_fulfilment_info(self) -> str:
         return self.get_name() + " is delivered digitally via a download link."
