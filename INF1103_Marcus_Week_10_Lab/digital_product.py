@@ -1,4 +1,5 @@
 from product import Product
+from supplier import Supplier
 
 
 #DigitalProduct class
@@ -6,10 +7,10 @@ from product import Product
 #attributes and methods. It has no weight, but adds a download size instead.
 class DigitalProduct(Product):
 
-    #Reuse the Product constructor with super() to set up the ID, name, price and stock,
-    #then initialise the extra download_size attribute
-    def __init__(self, product_id, name, price, stock, download_size):
-        super().__init__(product_id, name, price, stock)
+    #Reuse the Product constructor with super() to set up the ID, name, price, stock and
+    #supplier, then initialise the extra download_size attribute
+    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier, download_size: float) -> None:
+        super().__init__(product_id, name, price, stock, supplier)
         self.__download_size = float(download_size)   #float, in megabytes
 
     def get_download_size(self):
