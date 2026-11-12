@@ -15,6 +15,10 @@
 #  File Handling - load_inventory() and save_inventory() load/save inventory.json
 #  Main Program  - displays the menu, gets user input and calls Inventory methods
 
+#Allows the "Supplier | None" type hint to be written on Python 3.9 (built in from 3.10)
+from __future__ import annotations
+
+import inspect
 import io
 import json
 import os
@@ -30,10 +34,11 @@ from physical_product import PhysicalProduct
 from digital_product import DigitalProduct
 from inventory import Inventory
 from order import Order
+from order_line import OrderLine
 
 #inventory.json is kept in the same folder as this script, so it is found
 #no matter which folder the program is run from
-INVENTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inventory.json")
+INVENTORY_FILE: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inventory.json")
 
 
 # File Handling: turn a saved "supplier" dictionary back into a Supplier object.
@@ -41,7 +46,8 @@ INVENTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inven
 # supplier supplies many products (Supplier 1 ---- 0..* Product), just like
 # before the inventory was saved.
 # Products saved before Lab 8 have no supplier, so they share an "Unknown Supplier".
-def load_supplier(item, suppliers):
+# item is one product record read from inventory.json (a dictionary).
+def load_supplier(item: dict, suppliers: dict[str, Supplier]) -> Supplier:
     data = item.get("supplier", {"id": "S000", "name": "Unknown Supplier", "contact_email": "-"})
     supplier_id = data["id"]
     if supplier_id not in suppliers:
@@ -53,8 +59,8 @@ def load_supplier(item, suppliers):
 # "type" to create the right subclass (PhysicalProduct or DigitalProduct).
 # Otherwise, begin with an empty inventory.
 # Returns an Inventory object.
-def load_inventory():
-    inventory = Inventory()
+def load_inventory() -> Inventory:
+    inventory: Inventory = Inventory()
     if not os.path.exists(INVENTORY_FILE):
         print("inventory.json not found.")
         print("Starting with an empty inventory.")
@@ -64,12 +70,13 @@ def load_inventory():
     try:
         with open(INVENTORY_FILE, "r") as file:
             items = json.load(file)
-        suppliers = {}  #supplier ID -> Supplier object already created while loading
+        suppliers: dict[str, Supplier] = {}  #supplier ID -> Supplier object already created while loading
         for item in items:
             supplier = load_supplier(item, suppliers)
             #Products saved before Lab 7 have no "type" - they were all physical items,
             #so they load as physical products with an unknown (0 kg) weight
-            product_type = item.get("type", "physical")
+            product_type: str = item.get("type", "physical")
+            product: Product   #either subclass can be stored in a Product variable
             if product_type == "physical":
                 product = PhysicalProduct(item["id"], item["name"], item["price"], item["stock"], supplier, item.get("weight", 0))
             elif product_type == "digital":
@@ -91,8 +98,8 @@ def load_inventory():
 # attribute for that type, so the right subclass can be created when loading.
 # The Supplier object is saved as a nested dictionary of its details.
 # Returns True if saved, False if the file could not be written.
-def save_inventory(inventory):
-    items = []
+def save_inventory(inventory: Inventory) -> bool:
+    items: list[dict] = []
     for product in inventory.get_products():
         item = {
             "id": product.get_product_id(),
@@ -125,7 +132,7 @@ def save_inventory(inventory):
 
 # Keep asking until the user enters a number that is not negative
 # (used for price, weight and download size)
-def get_valid_number(prompt):
+def get_valid_number(prompt: str) -> float:
     while True:
         try:
             number = float(input(prompt))
@@ -138,7 +145,7 @@ def get_valid_number(prompt):
 
 # Keep asking until the user enters a whole number that is not negative
 #isdigit() rejects text and negative numbers as "-" is not a digit
-def get_valid_stock(prompt):
+def get_valid_stock(prompt: str) -> int:
     while True:
         stock = input(prompt)
         if stock.isdigit():
@@ -147,7 +154,7 @@ def get_valid_stock(prompt):
 
 
 # Keep asking until the user chooses a product type: 1 = physical, 2 = digital
-def get_product_type():
+def get_product_type() -> str:
     print("Product Type:")
     print("1. Physical Product")
     print("2. Digital Product")
@@ -162,7 +169,7 @@ def get_product_type():
 
 # Find a Supplier that is already linked to a product in the inventory.
 # Returns the Supplier object, or None if no product uses that supplier ID.
-def find_existing_supplier(inventory, supplier_id):
+def find_existing_supplier(inventory: Inventory, supplier_id: str) -> Supplier | None:
     for product in inventory.get_products():
         if product.get_supplier().get_supplier_id().upper() == supplier_id.upper():
             return product.get_supplier()
@@ -173,7 +180,7 @@ def find_existing_supplier(inventory, supplier_id):
 # Supplier object is reused (one supplier can supply many products). Otherwise a new,
 # independent Supplier object is created from the details the user enters.
 # Returns a Supplier object, or None if the details were invalid.
-def get_supplier_menu(inventory):
+def get_supplier_menu(inventory: Inventory) -> Supplier | None:
     supplier_id = input("Supplier ID: ").strip().upper()
     if supplier_id == "":
         print("Supplier ID cannot be empty.")
@@ -196,7 +203,7 @@ def get_supplier_menu(inventory):
 
 # Menu option 2: ask for the product type and details, create a PhysicalProduct
 # or DigitalProduct object (with its Supplier) and pass it to the Inventory
-def add_product_menu(inventory):
+def add_product_menu(inventory: Inventory) -> None:
     print("Add New Product")
     product_type = get_product_type()
     product_id = input("Product ID: ").strip().upper()
@@ -234,7 +241,7 @@ def add_product_menu(inventory):
 
 
 # Menu option 3: find the Product and ask it to update its own stock
-def update_stock_menu(inventory):
+def update_stock_menu(inventory: Inventory) -> None:
     print("Update Stock")
     product_id = input("Enter Product ID: ").strip()
     print()
@@ -257,7 +264,7 @@ def update_stock_menu(inventory):
 
 # Menu option 4: ask the Inventory to find the Product, then let the product show
 # its own details. Each product type displays its own information and fulfilment.
-def search_product_menu(inventory):
+def search_product_menu(inventory: Inventory) -> None:
     print("Search Product")
     product_id = input("Enter Product ID: ").strip()
     print()
@@ -278,7 +285,7 @@ def search_product_menu(inventory):
 
 # Menu option 5: ask the Inventory to remove the Product's reference.
 # Aggregation: the Product object is not destroyed - remove_product() hands it back.
-def remove_product_menu(inventory):
+def remove_product_menu(inventory: Inventory) -> None:
     print("Remove Product")
     product_id = input("Enter Product ID: ").strip()
     print()
@@ -289,7 +296,7 @@ def remove_product_menu(inventory):
     print("Product " + product.get_product_id() + " (" + product.get_name() + ") removed from the inventory.")
 
 
-def display_menu():
+def display_menu() -> None:
     print()
     print("----------- MENU -----------")
     print("1. Display All Products")
@@ -307,13 +314,13 @@ def display_menu():
 # The tests use their own temporary JSON file, so the real inventory.json is never changed.
 
 # Print one PASS/FAIL line and return whether the check passed
-def check(description, passed):
+def check(description: str, passed: bool) -> bool:
     print("  " + ("PASS" if passed else "FAIL") + " - " + description)
     return passed
 
 
 # Capture everything a product's display_information() prints, so it can be checked
-def get_display_output(product):
+def get_display_output(product: Product) -> str:
     captured = io.StringIO()
     with redirect_stdout(captured):
         product.display_information()
@@ -321,8 +328,8 @@ def get_display_output(product):
 
 
 # Lab 8 - 2.2: test the association between Supplier and Product
-def test_supplier_association():
-    results = []
+def test_supplier_association() -> list[bool]:
+    results: list[bool] = []
 
     #Create a Supplier object on its own, before any Product exists
     supplier = Supplier("S010", "Global Gadgets", "contact@globalgadgets.com")
@@ -364,8 +371,8 @@ def test_supplier_association():
 
 
 # Lab 8 - 3.2: test the aggregation between Inventory and Product
-def test_inventory_aggregation():
-    results = []
+def test_inventory_aggregation() -> list[bool]:
+    results: list[bool] = []
     supplier = Supplier("S020", "Keyboard World", "info@keyboardworld.com")
 
     #1. Create a Product BEFORE any Inventory exists
@@ -413,8 +420,8 @@ def test_inventory_aggregation():
 
 
 # Lab 8 - 4.3: test the composition between Order and OrderLine
-def test_order_composition():
-    results = []
+def test_order_composition() -> list[bool]:
+    results: list[bool] = []
     supplier = Supplier("S030", "Studio Gear", "hello@studiogear.com")
     microphone = PhysicalProduct("P030", "Microphone", 120.00, 15, supplier, 0.6)
     recording_software = DigitalProduct("P031", "Recording Software", 199.00, 50, supplier, 1200)
@@ -473,8 +480,36 @@ def test_order_composition():
     return results
 
 
-def run_tests():
-    results = []
+# Lab 8 - 5.2: check every method of every class has type hints on all of its
+# parameters (except self) and on its return value, and that Any is never used.
+# Python does not enforce type hints, so this test checks that they are WRITTEN.
+def test_type_hints() -> list[bool]:
+    results: list[bool] = []
+    classes = [Supplier, Product, CanBeShipped, PhysicalProduct, DigitalProduct, Inventory, OrderLine, Order]
+    for cls in classes:
+        missing: list[str] = []
+        uses_any = False
+        #Only the methods written in this class (not the ones it inherits)
+        for method_name, method in vars(cls).items():
+            if not inspect.isfunction(method):
+                continue
+            hints = method.__annotations__
+            for parameter in list(inspect.signature(method).parameters)[1:]:   #[1:] skips self
+                if parameter not in hints:
+                    missing.append(method_name + "(" + parameter + ")")
+            if "return" not in hints:
+                missing.append(method_name + "() return type")
+            if any("Any" in str(hint) for hint in hints.values()):
+                uses_any = True
+        description = cls.__name__ + " has type hints on all parameters and return values"
+        if missing:
+            description += " - missing: " + ", ".join(missing)
+        results.append(check(description, not missing and not uses_any))
+    return results
+
+
+def run_tests() -> None:
+    results: list[bool] = []
     music_supplier = Supplier("S001", "Acme Music Supplies", "sales@acmemusic.com")
     software_supplier = Supplier("S002", "SoftCorp", "orders@softcorp.com")
     guitar = PhysicalProduct("P005", "Guitar", 350.00, 8, music_supplier, 3.5)
@@ -597,6 +632,11 @@ def run_tests():
     results.extend(test_order_composition())
     print()
 
+    # Lab 8 - 5.2 Review all type decisions
+    print("Lab 8 - 5.2 Type hints are present on every class")
+    results.extend(test_type_hints())
+    print()
+
     passed = results.count(True)
     print(str(passed) + " of " + str(len(results)) + " tests passed.")
     print("All tests passed!" if passed == len(results) else "Some tests FAILED.")
@@ -612,7 +652,7 @@ print("=" * 40)
 print("INVENTORY MANAGEMENT SYSTEM")
 print("=" * 40)
 print()
-inventory = load_inventory()  #Inventory object holding Product objects
+inventory: Inventory = load_inventory()  #Inventory object holding Product objects
 
 while True:
     display_menu()
