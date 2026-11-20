@@ -18,6 +18,8 @@
 #Allows the "Supplier | None" type hint to be written on Python 3.9 (built in from 3.10)
 from __future__ import annotations
 
+import builtins
+import csv
 import inspect
 import io
 import json
@@ -46,6 +48,8 @@ from order_line import OrderLine
 #inventory.json is kept in the same folder as this script, so it is found
 #no matter which folder the program is run from
 INVENTORY_FILE: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inventory.json")
+#products.csv (Lab 9 - 5.2) is kept in the same folder as this script
+PRODUCTS_FILE: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "products.csv")
 
 
 # File Handling: turn a saved "supplier" dictionary back into a Supplier object.
@@ -94,6 +98,43 @@ def load_inventory() -> Inventory:
         #File exists but does not contain valid product data
         print("inventory.json is invalid. Starting with an empty inventory.")
         return Inventory()
+
+
+# File Handling (Lab 9 - 5.2): load products from a CSV file into an Inventory.
+# Each row is created through the ProductFactory. Uses try / except / else / finally:
+#   try     - open the file
+#   except  - FileNotFoundError: the file does not exist -> simple message, no crash
+#   else    - only runs if the file opened -> read the rows
+#   finally - ALWAYS runs, whether the file opened or not
+# Each row has its own try / except ValueError, so one bad row (unknown product type,
+# a price that is not a number, a broken validation rule, a missing column) is reported
+# and skipped, and loading carries on with the next row.
+# The CSV has no supplier column, so every loaded product gets the supplier passed in.
+def load_products(path: str, inventory: Inventory, supplier: Supplier) -> None:
+    try:
+        file = open(path, newline="")
+    except FileNotFoundError:
+        print("Products file not found: " + path)
+    else:
+        loaded = 0
+        with file:
+            reader = csv.reader(file)
+            next(reader, None)   #skip the header row
+            #start=2: the header is line 1, so the first product is line 2 of the file
+            for line_number, row in enumerate(reader, start=2):
+                try:
+                    product_type, product_id, name, price, stock_quantity = row
+                    product: Product = ProductFactory.create(product_type, product_id, name, float(price), int(stock_quantity), supplier)
+                except ValueError as error:
+                    print("Skipped line " + str(line_number) + " " + str(row) + ": " + str(error))
+                    continue
+                if inventory.add_product(product):
+                    loaded += 1
+                else:
+                    print("Skipped line " + str(line_number) + ": product ID " + product_id + " already exists.")
+        print(str(loaded) + " products loaded.")
+    finally:
+        print("Load attempt finished.")
 
 
 # File Handling: save every Product in the Inventory to inventory.json.
@@ -149,12 +190,35 @@ def get_valid_number(prompt: str) -> float:
 
 # Keep asking until the user enters a whole number that is not negative
 #isdigit() rejects text and negative numbers as "-" is not a digit
+# Lab 9 fix (from the 1.5 Diagnose): the old version used isdigit(), which is True for
+# characters like "²", but int("²") then raised an uncaught ValueError and crashed the
+# program. Now int() itself is the check, inside try / except ValueError.
 def get_valid_stock(prompt: str) -> int:
     while True:
-        stock = input(prompt)
-        if stock.isdigit():
-            return int(stock)
+        try:
+            stock = int(input(prompt))
+            if stock >= 0:
+                return stock
+        except ValueError:
+            pass
         print("Invalid quantity! We only accept positive whole numbers.")
+
+
+# Lab 9 - 5.1: keep asking until the user enters a number greater than zero (e.g. a price).
+# Two different problems are handled:
+#   exception handling - float("abc") raises ValueError -> caught, ask again
+#   validation         - "-5" converts fine but breaks the rule (must be > 0) -> ask again
+# The function never returns incomplete or invalid data - it only returns a valid value.
+def get_positive_float(prompt: str) -> float:
+    while True:
+        try:
+            value = float(input(prompt))
+            if value <= 0:
+                print("Please enter a number greater than zero.")
+                continue
+            return value
+        except ValueError:
+            print("Please enter a valid number, e.g. 12.50")
 
 
 # Keep asking until the user chooses a product type: 1 = physical, 2 = digital
@@ -223,7 +287,7 @@ def add_product_menu(inventory: Inventory) -> None:
         print("Product name cannot be empty.")
         return
 
-    price = get_valid_number("Price: ")
+    price = get_positive_float("Price: ")   #Product requires a price greater than zero
     stock = get_valid_stock("Stock Quantity: ")
 
     #The Supplier object is created (or found) first, then passed to the Product
@@ -735,6 +799,109 @@ def test_validation() -> list[bool]:
     return results
 
 
+# Run function(prompt) as if the user typed each value in typed_values.
+# Returns what the function returned and everything it printed.
+def run_with_typed_input(function, prompt: str, typed_values: list[str]) -> tuple[object, str]:
+    values = iter(typed_values)
+    real_input = builtins.input
+
+    def fake_input(text: str = "") -> str:
+        value = next(values)
+        print(text + value)   #show what the "user" typed, like a real terminal
+        return value
+
+    builtins.input = fake_input
+    captured = io.StringIO()
+    try:
+        with redirect_stdout(captured):
+            result = function(prompt)
+    finally:
+        builtins.input = real_input   #always put the real input() back
+    return result, captured.getvalue()
+
+
+# Lab 9 - 5.1: invalid user input is handled without crashing and the user is asked again
+def test_user_input() -> list[bool]:
+    results: list[bool] = []
+
+    #Predict first: the user types abc, then -5, then 12.50
+    value, output = run_with_typed_input(get_positive_float, "Price: ", ["abc", "-5", "12.50"])
+    print(output, end="")
+    print("  -> returned " + repr(value))
+    lines = output.splitlines()
+    results.append(check("'abc' prints 'Please enter a valid number, e.g. 12.50'", lines[1] == "Please enter a valid number, e.g. 12.50"))
+    results.append(check("'-5' prints 'Please enter a number greater than zero.'", lines[3] == "Please enter a number greater than zero."))
+    results.append(check("'12.50' is accepted and 12.5 is returned (a float)", value == 12.5 and type(value) == float))
+    results.append(check("nothing is printed after the valid value", len(lines) == 5))
+
+    value, output = run_with_typed_input(get_positive_float, "Price: ", ["0", "", "1e-3"])
+    results.append(check("get_positive_float() rejects 0 and an empty entry", value == 0.001 and output.count("Please enter") == 2))
+
+    #The isdigit() crash from the 1.5 Diagnose is fixed
+    value, output = run_with_typed_input(get_valid_stock, "Stock Quantity: ", ["\u00b2", "-1", "2.5", "7"])
+    results.append(check("get_valid_stock() no longer crashes on '\u00b2' and asks again until it gets 7", value == 7 and output.count("Invalid quantity!") == 3))
+    return results
+
+
+# Lab 9 - 5.2: products.csv loading - bad rows are skipped, a missing file does not crash
+def test_load_products() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S100", "CSV Wholesale", "import@csvwholesale.com")
+
+    #Predict first: load the products.csv given in the lab
+    inventory = Inventory()
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        load_products(PRODUCTS_FILE, inventory, supplier)
+    output = captured.getvalue()
+    print(output, end="")
+    lines = output.splitlines()
+    results.append(check("3 valid products are loaded (P001, D001, P003)", [p.get_product_id() for p in inventory.get_products()] == ["P001", "D001", "P003"]))
+    results.append(check("the 'service' row (line 4) is reported and skipped", lines[0].startswith("Skipped line 4") and "Unknown product type: service" in lines[0]))
+    results.append(check("the 'abc' price row (line 5) is reported and skipped", lines[1].startswith("Skipped line 5") and "could not convert string to float: 'abc'" in lines[1]))
+    results.append(check("loading carried on after the bad rows (P003 on line 6 loaded)", inventory.find_product("P003") is not None))
+    results.append(check("messages print in order: 2 skips, '3 products loaded.', 'Load attempt finished.'",
+                         len(lines) == 4 and lines[2] == "3 products loaded." and lines[3] == "Load attempt finished."))
+    results.append(check("products from the file are created through the factory with the right types",
+                         type(inventory.find_product("D001")) == DigitalProduct and type(inventory.find_product("P001")) == PhysicalProduct))
+
+    #Predict first: rename products.csv (here: a path that does not exist)
+    missing_path = os.path.join(tempfile.gettempdir(), "renamed_products.csv")
+    empty_inventory = Inventory()
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        load_products(missing_path, empty_inventory, supplier)
+    output = captured.getvalue()
+    print("With the file renamed:")
+    print(output, end="")
+    lines = output.splitlines()
+    results.append(check("a missing file is handled gracefully (no crash, simple message)", lines[0] == "Products file not found: " + missing_path))
+    results.append(check("except and finally run, else does not (no 'products loaded' line)",
+                         len(lines) == 2 and lines[1] == "Load attempt finished." and "products loaded" not in output))
+    results.append(check("no products were added when the file is missing", len(empty_inventory.get_products()) == 0))
+
+    #Rows with the wrong number of columns and broken validation rules are skipped too
+    bad_file = os.path.join(tempfile.mkdtemp(), "bad_products.csv")
+    with open(bad_file, "w", newline="") as file:
+        file.write("product_type,product_id,name,price,stock_quantity\n")
+        file.write("physical,P900,Missing Stock,10.00\n")      #only 4 columns
+        file.write("physical,P901,Free Item,0,5\n")            #price must be > 0
+        file.write("digital,D900,Negative Stock,5.00,-1\n")    #stock cannot be negative
+        file.write("digital,D901,Good Item,5.00,1\n")
+    other_inventory = Inventory()
+    captured = io.StringIO()
+    try:
+        with redirect_stdout(captured):
+            load_products(bad_file, other_inventory, supplier)
+    finally:
+        os.remove(bad_file)
+        os.rmdir(os.path.dirname(bad_file))
+    output = captured.getvalue()
+    results.append(check("rows with missing columns or broken rules are skipped, the good row loads",
+                         output.count("Skipped line") == 3 and "1 products loaded." in output and other_inventory.find_product("D901") is not None))
+    return results
+
+
 # Lab 8 - 7.2: demonstrate polymorphism through the common Product type
 def test_polymorphism() -> list[bool]:
     results: list[bool] = []
@@ -957,6 +1124,16 @@ def run_tests() -> None:
     # Lab 9 - 4 Validation
     print("Lab 9 - 4 Validation: invalid prices, stock and quantities are rejected")
     results.extend(test_validation())
+    print()
+
+    # Lab 9 - 5.1 User input
+    print("Lab 9 - 5.1 Handling invalid user input")
+    results.extend(test_user_input())
+    print()
+
+    # Lab 9 - 5.2 Loading products from a file
+    print("Lab 9 - 5.2 Loading products from products.csv")
+    results.extend(test_load_products())
     print()
 
     # Lab 8 - 5.2 Review all type decisions
