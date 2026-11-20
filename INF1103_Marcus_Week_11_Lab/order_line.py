@@ -14,9 +14,15 @@ class OrderLine:
 
     #Type hints: product is a reference to a Product object (either subclass),
     #quantity is a whole number
+    #Validation (Lab 9): the OrderLine protects its own quantity, rather than relying on
+    #every caller (Order, the menu, the tests) to check it first.
+    #Raises ValueError if the quantity is not greater than zero.
     def __init__(self, product: Product, quantity: int) -> None:
+        quantity = int(quantity)
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than zero.")
         self.__product: Product = product      #reference to an existing Product
-        self.__quantity: int = int(quantity)   #how many of the product were ordered
+        self.__quantity: int = quantity        #how many of the product were ordered
 
     #Getters: let other code read the order line without being able to change it
     def get_product(self) -> Product:

@@ -414,7 +414,7 @@ def test_inventory_aggregation() -> list[bool]:
     results.append(check("the Product kept its updated stock and supplier", inventory_b.find_product("P020").get_stock() == 10 and keyboard.get_supplier() is supplier))
 
     #5. Emptying an inventory does not destroy its products
-    mouse = DigitalProduct("P021", "Mouse Driver", 0.00, 999, supplier, 25)
+    mouse = DigitalProduct("P021", "Mouse Driver", 4.99, 999, supplier, 25)
     inventory_b.add_product(mouse)
     for product in inventory_b.get_products():
         inventory_b.remove_product(product.get_product_id())
@@ -688,6 +688,53 @@ def test_product_factory() -> list[bool]:
     return results
 
 
+# Try to run create(); return the ValueError message if it was rejected, or None if it was accepted
+def get_rejection(create) -> str | None:
+    try:
+        create()
+        return None
+    except ValueError as error:
+        return str(error)
+
+
+# Lab 9 - 4: test that each class rejects data that breaks its rules
+def test_validation() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S090", "Valid Goods", "info@validgoods.com")
+    rejected_cases = [
+        ("a price of 0", lambda: PhysicalProduct("P090", "Free Pen", 0, 10, supplier, 0.1), "Price must be greater than zero."),
+        ("a negative price", lambda: DigitalProduct("D090", "Refund App", -5.00, 10, supplier, 50), "Price must be greater than zero."),
+        ("a negative stock quantity (PhysicalProduct)", lambda: PhysicalProduct("P091", "Chair", 50, -1, supplier, 7), "Stock quantity cannot be negative."),
+        ("a negative stock quantity (DigitalProduct)", lambda: DigitalProduct("D091", "Game", 20, -3, supplier, 900), "Stock quantity cannot be negative."),
+        ("a negative stock quantity through the factory", lambda: ProductFactory.create("digital", "D092", "Plugin", 10, -2, supplier), "Stock quantity cannot be negative."),
+        ("a price that is not a number", lambda: ProductFactory.create("physical", "P092", "Office Chair", "abc", 3, supplier), "could not convert string to float: 'abc'"),
+    ]
+    for description, create, expected_message in rejected_cases:
+        message = get_rejection(create)
+        print("  " + description + " -> ValueError: " + str(message))
+        results.append(check("Product rejects " + description, message == expected_message))
+
+    #Valid edge cases are still accepted - validation must not reject good data
+    results.append(check("Product accepts a stock quantity of 0 (out of stock)", get_rejection(lambda: PhysicalProduct("P093", "Sold Out Lamp", 25, 0, supplier, 1)) is None))
+    results.append(check("Product accepts a small positive price (0.01)", get_rejection(lambda: DigitalProduct("D093", "Sticker Pack", 0.01, 5, supplier, 1)) is None))
+
+    #OrderLine protects its own quantity - even when created through Order
+    pen = PhysicalProduct("P094", "Pen", 2.50, 100, supplier, 0.02)
+    order = Order("O300")
+    for bad_quantity in [0, -2]:
+        message = get_rejection(lambda: order.add_order_line(pen, bad_quantity))
+        print("  order quantity " + str(bad_quantity) + " -> ValueError: " + str(message))
+        results.append(check("OrderLine rejects a quantity of " + str(bad_quantity), message == "Quantity must be greater than zero."))
+    results.append(check("a rejected order line is NOT added to the order", len(order.get_order_lines()) == 0))
+    order.add_order_line(pen, 1)
+    results.append(check("OrderLine accepts a quantity of 1", len(order.get_order_lines()) == 1 and order.calculate_total() == 2.50))
+
+    #Predict first (LSP): both subclasses follow the SAME stock rule from Product
+    results.append(check("PhysicalProduct and DigitalProduct do not override Product's constructor rules",
+                         "Stock quantity cannot be negative" not in inspect.getsource(PhysicalProduct) + inspect.getsource(DigitalProduct)))
+    return results
+
+
 # Lab 8 - 7.2: demonstrate polymorphism through the common Product type
 def test_polymorphism() -> list[bool]:
     results: list[bool] = []
@@ -905,6 +952,11 @@ def run_tests() -> None:
     # Lab 9 - 3 Factory pattern
     print("Lab 9 - 3 Factory pattern: creating products")
     results.extend(test_product_factory())
+    print()
+
+    # Lab 9 - 4 Validation
+    print("Lab 9 - 4 Validation: invalid prices, stock and quantities are rejected")
+    results.extend(test_validation())
     print()
 
     # Lab 8 - 5.2 Review all type decisions

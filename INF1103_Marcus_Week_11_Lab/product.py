@@ -19,11 +19,22 @@ class Product(ABC):
     #private, so outside code should use the public methods below instead.
     #Type hints show the intended types. supplier: Supplier means the constructor expects
     #a Supplier OBJECT, not just the supplier's name or ID.
+    #Validation (Lab 9): Product owns the rules for price and stock, so it checks them
+    #itself before storing anything. Every subclass calls this constructor through
+    #super(), so PhysicalProduct and DigitalProduct get exactly the same rules (LSP).
+    #Raises ValueError with a clear message if a rule is broken - the object is never
+    #created with invalid data.
     def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier) -> None:
+        price = float(price)   #float("abc") raises ValueError on its own
+        stock = int(stock)
+        if price <= 0:
+            raise ValueError("Price must be greater than zero.")
+        if stock < 0:
+            raise ValueError("Stock quantity cannot be negative.")
         self.__product_id: str = product_id
         self.__name: str = name
-        self.__price: float = float(price)
-        self.__stock: int = int(stock)
+        self.__price: float = price
+        self.__stock: int = stock
         self.__supplier: Supplier = supplier   #reference to an existing Supplier object
 
     #Getters: let other code read the attributes without being able to change them
