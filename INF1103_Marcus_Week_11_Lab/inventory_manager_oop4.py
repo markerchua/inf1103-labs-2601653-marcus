@@ -34,6 +34,11 @@ from physical_product import PhysicalProduct
 from digital_product import DigitalProduct
 from inventory import Inventory
 from order import Order
+from discount_strategy import DiscountStrategy
+from no_discount import NoDiscount
+from percentage_discount import PercentageDiscount
+from bulk_discount import BulkDiscount
+from student_discount import StudentDiscount
 from order_line import OrderLine
 
 #inventory.json is kept in the same folder as this script, so it is found
@@ -548,6 +553,99 @@ def test_liskov_substitution() -> list[bool]:
     return results
 
 
+# Lab 9 - 2.3: test that Order calculates its total through a DiscountStrategy
+def test_discount_strategy() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S060", "Gadget Store", "orders@gadgetstore.com")
+    headset = PhysicalProduct("P060", "Gaming Headset", 100.00, 20, supplier, 0.4)
+    game = DigitalProduct("P061", "Strategy Game", 50.00, 500, supplier, 30000)
+
+    #Each strategy on its own
+    results.append(check("NoDiscount returns the total unchanged (250 -> 250)", NoDiscount().apply(250) == 250))
+    results.append(check("PercentageDiscount(10) takes 10% off (250 -> 225)", abs(PercentageDiscount(10).apply(250) - 225) < 0.001))
+    results.append(check("BulkDiscount(200, 20) takes 20 off a total of 200 or more (250 -> 230)", abs(BulkDiscount(200, 20).apply(250) - 230) < 0.001))
+    results.append(check("BulkDiscount(200, 20) does not apply below the threshold (150 -> 150)", BulkDiscount(200, 20).apply(150) == 150))
+    try:
+        DiscountStrategy()
+        results.append(check("DiscountStrategy is abstract and cannot be created", False))
+    except TypeError:
+        results.append(check("DiscountStrategy is abstract and cannot be created", True))
+
+    #An Order created WITHOUT a strategy uses NoDiscount()
+    plain_order = Order("O100")
+    plain_order.add_order_line(headset, 1)
+    results.append(check("an Order with no strategy given uses NoDiscount()", type(plain_order.get_discount()) == NoDiscount))
+    results.append(check("an Order with NoDiscount totals 100.00", plain_order.calculate_total() == 100.00))
+
+    #Predict first: an order whose lines add up to 250
+    #  2 x Gaming Headset ($100.00) + 1 x Strategy Game ($50.00) = $250.00
+    order = Order("O101", BulkDiscount(200, 20))
+    order.add_order_line(headset, 2)
+    order.add_order_line(game, 1)
+    print("Order with BulkDiscount(200, 20):")
+    order.display_information()
+    results.append(check("the order lines add up to 250.00", order.calculate_subtotal() == 250.00))
+    results.append(check("with BulkDiscount(200, 20) calculate_total() returns 230.00", abs(order.calculate_total() - 230.00) < 0.001))
+
+    #Change the strategy on the SAME order with set_discount()
+    order.set_discount(PercentageDiscount(10))
+    print("Same order after set_discount(PercentageDiscount(10)):")
+    order.display_information()
+    results.append(check("after set_discount(PercentageDiscount(10)) calculate_total() returns 225.00", abs(order.calculate_total() - 225.00) < 0.001))
+    results.append(check("the order lines did not change when the strategy changed", order.calculate_subtotal() == 250.00 and len(order.get_order_lines()) == 2))
+
+    #Order contains no if/elif logic about discount types - it only calls apply()
+    order_source = inspect.getsource(Order)
+    no_discount_logic = all(name not in order_source for name in ["PercentageDiscount", "BulkDiscount", "discount_type", "elif"])
+    results.append(check("Order has no if/elif logic about discount types", no_discount_logic))
+
+    #Invalid strategy settings are rejected
+    try:
+        PercentageDiscount(150)
+        results.append(check("PercentageDiscount(150) is rejected", False))
+    except ValueError as error:
+        results.append(check("PercentageDiscount(150) is rejected: " + str(error), True))
+    try:
+        BulkDiscount(200, -20)
+        results.append(check("BulkDiscount(200, -20) is rejected", False))
+    except ValueError as error:
+        results.append(check("BulkDiscount(200, -20) is rejected: " + str(error), True))
+    return results
+
+
+# Lab 9 - 2.4: a fourth strategy (StudentDiscount) works with the UNCHANGED Order class
+def test_new_discount_strategy() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S070", "Campus Books", "help@campusbooks.com")
+    textbook = PhysicalProduct("P070", "Programming Textbook", 125.00, 40, supplier, 1.5)
+
+    #Order is used exactly as before - only a different strategy object is passed in
+    order = Order("O200", StudentDiscount())
+    order.add_order_line(textbook, 2)   #2 x $125.00 = $250.00
+    print("Order with the new StudentDiscount:")
+    order.display_information()
+    results.append(check("StudentDiscount is a DiscountStrategy", isinstance(order.get_discount(), DiscountStrategy)))
+    results.append(check("StudentDiscount takes 5% off (250.00 -> 237.50)", abs(order.calculate_total() - 237.50) < 0.001))
+    results.append(check("Order's source code does not mention StudentDiscount (Order was not changed)", "StudentDiscount" not in inspect.getsource(Order)))
+
+    #Predict first: Order and DiscountStrategy - association, aggregation or composition?
+    #Two orders can SHARE the same strategy object, because the Order only uses it and
+    #does not create or own it -> association (Order 0..* ---- 1 DiscountStrategy)
+    shared_discount = PercentageDiscount(10)
+    order_a = Order("O201", shared_discount)
+    order_b = Order("O202", shared_discount)
+    order_a.add_order_line(textbook, 1)   #$125.00
+    order_b.add_order_line(textbook, 4)   #$500.00
+    print("id(order_a's discount) = " + str(id(order_a.get_discount())) + " | id(order_b's discount) = " + str(id(order_b.get_discount())))
+    results.append(check("two orders can share the SAME PercentageDiscount object", order_a.get_discount() is order_b.get_discount() is shared_discount))
+    results.append(check("each order still calculates its own total (112.50 and 450.00)", abs(order_a.calculate_total() - 112.50) < 0.001 and abs(order_b.calculate_total() - 450.00) < 0.001))
+
+    #The strategy exists independently of the orders that use it
+    del order_a
+    results.append(check("the shared strategy still works after one order is deleted", order_b.get_discount() is shared_discount and abs(shared_discount.apply(100) - 90) < 0.001))
+    return results
+
+
 # Lab 8 - 7.2: demonstrate polymorphism through the common Product type
 def test_polymorphism() -> list[bool]:
     results: list[bool] = []
@@ -588,7 +686,8 @@ def test_polymorphism() -> list[bool]:
 # Python does not enforce type hints, so this test checks that they are WRITTEN.
 def test_type_hints() -> list[bool]:
     results: list[bool] = []
-    classes = [Supplier, Product, CanBeShipped, PhysicalProduct, DigitalProduct, Inventory, OrderLine, Order]
+    classes = [Supplier, Product, CanBeShipped, PhysicalProduct, DigitalProduct, Inventory, OrderLine, Order,
+               DiscountStrategy, NoDiscount, PercentageDiscount, BulkDiscount, StudentDiscount]
     for cls in classes:
         missing: list[str] = []
         uses_any = False
@@ -743,6 +842,16 @@ def run_tests() -> None:
     # Lab 8 - 7 Polymorphism
     print("Lab 8 - 7 Polymorphism through the Product type")
     results.extend(test_polymorphism())
+    print()
+
+    # Lab 9 - 2.3 Strategy pattern: Order uses a DiscountStrategy
+    print("Lab 9 - 2.3 Strategy pattern: order discounts")
+    results.extend(test_discount_strategy())
+    print()
+
+    # Lab 9 - 2.4 Extend without modifying
+    print("Lab 9 - 2.4 New strategy added without changing Order")
+    results.extend(test_new_discount_strategy())
     print()
 
     # Lab 8 - 5.2 Review all type decisions

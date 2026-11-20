@@ -1,5 +1,10 @@
+#Allows the "DiscountStrategy | None" type hint to be written on Python 3.9
+from __future__ import annotations
+
 from product import Product
 from order_line import OrderLine
+from discount_strategy import DiscountStrategy
+from no_discount import NoDiscount
 
 
 #Order class
@@ -12,14 +17,32 @@ from order_line import OrderLine
 #with its Order.
 #The Order does NOT own the Products - each OrderLine only refers to a Product.
 #UML: Order 1 <filled diamond>---- 0..* OrderLine
+#Strategy pattern: the Order is GIVEN a DiscountStrategy and only calls its apply()
+#method. It contains no if/elif logic about discount types, so a new kind of discount
+#is a new DiscountStrategy class - Order itself never needs to change.
 class Order:
 
-    def __init__(self, order_id: str) -> None:
+    #If no discount strategy is given, the order uses NoDiscount(), so calculate_total()
+    #can always call apply() without checking whether a discount exists.
+    #(None is used as the default instead of NoDiscount() so each Order gets its own
+    #default object rather than sharing one created when the class was defined.)
+    def __init__(self, order_id: str, discount: DiscountStrategy | None = None) -> None:
         self.__order_id: str = order_id                #unique identifier for the order
         self.__order_lines: list[OrderLine] = []       #the parts this Order owns
+        if discount is None:
+            discount = NoDiscount()
+        self.__discount: DiscountStrategy = discount   #the strategy this Order uses
 
     def get_order_id(self) -> str:
         return self.__order_id
+
+    def get_discount(self) -> DiscountStrategy:
+        return self.__discount
+
+    #Change the discount strategy of an existing order - any DiscountStrategy can be
+    #swapped in, and Order does not need to know which one it is
+    def set_discount(self, discount: DiscountStrategy) -> None:
+        self.__discount = discount
 
     #Return a copy of the list, so outside code can read the order lines but cannot
     #add, remove or move OrderLines without going through the Order's own methods
@@ -43,13 +66,19 @@ class Order:
                 return True
         return False
 
-    #Total value of the order: ask each OrderLine to calculate its own subtotal
-    #and add them together
-    def calculate_total(self) -> float:
+    #Value of the order BEFORE any discount: ask each OrderLine to calculate its own
+    #subtotal and add them together
+    def calculate_subtotal(self) -> float:
         total = 0.0
         for order_line in self.__order_lines:
             total += order_line.calculate_subtotal()
         return total
+
+    #Value of the order AFTER the discount: the order line subtotals are added up and
+    #the result is passed to the strategy's apply() method. Order does not know or care
+    #which strategy it has - it just calls apply().
+    def calculate_total(self) -> float:
+        return self.__discount.apply(self.calculate_subtotal())
 
     #Display the order, each of its order lines and the order total
     def display_information(self) -> None:
@@ -59,4 +88,6 @@ class Order:
         for order_line in self.__order_lines:
             print("  ", end="")
             order_line.display_information()
+        print("  Subtotal: $" + format(self.calculate_subtotal(), ".2f"))
+        print("  Discount: " + type(self.__discount).__name__)
         print("  Order Total: $" + format(self.calculate_total(), ".2f"))
