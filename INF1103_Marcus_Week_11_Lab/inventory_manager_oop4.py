@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import tempfile
+import traceback
 from contextlib import redirect_stdout
 
 #Each class is kept in its own file (module) and imported here
@@ -39,6 +40,7 @@ from no_discount import NoDiscount
 from percentage_discount import PercentageDiscount
 from bulk_discount import BulkDiscount
 from student_discount import StudentDiscount
+from product_factory import ProductFactory
 from order_line import OrderLine
 
 #inventory.json is kept in the same folder as this script, so it is found
@@ -81,13 +83,10 @@ def load_inventory() -> Inventory:
             #Products saved before Lab 7 have no "type" - they were all physical items,
             #so they load as physical products with an unknown (0 kg) weight
             product_type: str = item.get("type", "physical")
-            product: Product   #either subclass can be stored in a Product variable
-            if product_type == "physical":
-                product = PhysicalProduct(item["id"], item["name"], item["price"], item["stock"], supplier, item.get("weight", 0))
-            elif product_type == "digital":
-                product = DigitalProduct(item["id"], item["name"], item["price"], item["stock"], supplier, item["download_size"])
-            else:
-                raise ValueError("Unknown product type: " + str(product_type))
+            #Factory pattern: the factory decides which class to create and returns a
+            #Product. An unknown type raises ValueError, which is caught below.
+            product: Product = ProductFactory.create(product_type, item["id"], item["name"], item["price"], item["stock"], supplier,
+                                                     weight=item.get("weight", 0), download_size=item.get("download_size", 0))
             inventory.add_product(product)
         print("Inventory loaded successfully.")
         return inventory
@@ -232,13 +231,19 @@ def add_product_menu(inventory: Inventory) -> None:
     if supplier is None:
         return
 
-    #Ask for the extra attribute that belongs to the chosen product type
+    #Ask for the extra detail that belongs to the chosen product type.
+    #(This if only decides which QUESTION to ask the user - the decision about which
+    #class to CREATE belongs to the ProductFactory.)
+    weight = 0.0
+    download_size = 0.0
     if product_type == "physical":
         weight = get_valid_number("Weight (kg): ")
-        product = PhysicalProduct(product_id, name, price, stock, supplier, weight)
     else:
         download_size = get_valid_number("Download Size (MB): ")
-        product = DigitalProduct(product_id, name, price, stock, supplier, download_size)
+
+    #Factory pattern: ask the factory for the product instead of creating it directly
+    product: Product = ProductFactory.create(product_type, product_id, name, price, stock, supplier,
+                                             weight=weight, download_size=download_size)
 
     inventory.add_product(product)
     print()
@@ -646,6 +651,43 @@ def test_new_discount_strategy() -> list[bool]:
     return results
 
 
+# Lab 9 - 3: test the ProductFactory
+def test_product_factory() -> list[bool]:
+    results: list[bool] = []
+    supplier = Supplier("S080", "Factory Supplies", "hello@factorysupplies.com")
+
+    #3.2 The factory creates the right subclass, but the caller only sees a Product
+    lamp: Product = ProductFactory.create("physical", "P080", "Desk Lamp", 25.00, 10, supplier, weight=1.2)
+    editor: Product = ProductFactory.create("digital", "D080", "Photo Editor", 49.90, 100, supplier, download_size=850)
+    print("Products created by the factory:")
+    lamp.display_information()
+    editor.display_information()
+    results.append(check("create(\"physical\", ...) returns a PhysicalProduct", type(lamp) == PhysicalProduct))
+    results.append(check("create(\"digital\", ...) returns a DigitalProduct", type(editor) == DigitalProduct))
+    results.append(check("the factory passes on every value (price, stock, supplier, weight)", lamp.get_price() == 25.00 and lamp.get_stock() == 10 and lamp.get_supplier() is supplier and lamp.get_weight() == 1.2))
+    results.append(check("the product type is not case-sensitive (\" Physical \")", type(ProductFactory.create(" Physical ", "P081", "Mouse", 15, 5, supplier)) == PhysicalProduct))
+    results.append(check("weight / download size default to 0 when not given", ProductFactory.create("digital", "D081", "Font Pack", 9, 5, supplier).get_download_size() == 0))
+    results.append(check("create() is declared to return the base type Product", ProductFactory.create.__annotations__["return"] in (Product, "Product")))
+
+    #3.2 Predict first: an unknown product type
+    try:
+        ProductFactory.create("service", "S001", "Installation", 30.00, 5, supplier)
+        results.append(check("create(\"service\", ...) raises ValueError", False))
+    except ValueError as error:
+        #Show WHICH line raised the exception (the last frame of the traceback)
+        last_frame = traceback.extract_tb(error.__traceback__)[-1]
+        print("  ValueError: " + str(error))
+        print("  Raised in " + os.path.basename(last_frame.filename) + ", line " + str(last_frame.lineno) + ": " + last_frame.line)
+        results.append(check("create(\"service\", ...) raises ValueError with a clear message", str(error) == "Unknown product type: service"))
+        results.append(check("the exception is raised inside ProductFactory.create()", last_frame.name == "create" and "raise ValueError" in last_frame.line))
+
+    #Products are created through the factory, not directly, in the program itself
+    program_code = inspect.getsource(load_inventory) + inspect.getsource(add_product_menu)
+    results.append(check("load_inventory() and add_product_menu() create products only through the factory",
+                         "PhysicalProduct(" not in program_code and "DigitalProduct(" not in program_code and program_code.count("ProductFactory.create(") == 2))
+    return results
+
+
 # Lab 8 - 7.2: demonstrate polymorphism through the common Product type
 def test_polymorphism() -> list[bool]:
     results: list[bool] = []
@@ -687,16 +729,22 @@ def test_polymorphism() -> list[bool]:
 def test_type_hints() -> list[bool]:
     results: list[bool] = []
     classes = [Supplier, Product, CanBeShipped, PhysicalProduct, DigitalProduct, Inventory, OrderLine, Order,
-               DiscountStrategy, NoDiscount, PercentageDiscount, BulkDiscount, StudentDiscount]
+               DiscountStrategy, NoDiscount, PercentageDiscount, BulkDiscount, StudentDiscount, ProductFactory]
     for cls in classes:
         missing: list[str] = []
         uses_any = False
         #Only the methods written in this class (not the ones it inherits)
         for method_name, method in vars(cls).items():
+            is_static = isinstance(method, staticmethod)
+            if is_static:
+                method = method.__func__   #a static method has no self to skip
             if not inspect.isfunction(method):
                 continue
             hints = method.__annotations__
-            for parameter in list(inspect.signature(method).parameters)[1:]:   #[1:] skips self
+            parameters = list(inspect.signature(method).parameters)
+            if not is_static:
+                parameters = parameters[1:]   #skip self
+            for parameter in parameters:
                 if parameter not in hints:
                     missing.append(method_name + "(" + parameter + ")")
             if "return" not in hints:
@@ -852,6 +900,11 @@ def run_tests() -> None:
     # Lab 9 - 2.4 Extend without modifying
     print("Lab 9 - 2.4 New strategy added without changing Order")
     results.extend(test_new_discount_strategy())
+    print()
+
+    # Lab 9 - 3 Factory pattern
+    print("Lab 9 - 3 Factory pattern: creating products")
+    results.extend(test_product_factory())
     print()
 
     # Lab 8 - 5.2 Review all type decisions
