@@ -98,6 +98,11 @@ def load_inventory() -> Inventory:
         #File exists but does not contain valid product data
         print("inventory.json is invalid. Starting with an empty inventory.")
         return Inventory()
+    except OSError:
+        #Lab 9 fix (from the 1.5 Diagnose): the file exists but cannot be opened,
+        #e.g. it is locked by another program or there is no permission to read it
+        print("inventory.json could not be read. Starting with an empty inventory.")
+        return Inventory()
 
 
 # File Handling (Lab 9 - 5.2): load products from a CSV file into an Inventory.
@@ -1144,48 +1149,56 @@ def run_tests() -> None:
     passed = results.count(True)
     print(str(passed) + " of " + str(len(results)) + " tests passed.")
     print("All tests passed!" if passed == len(results) else "Some tests FAILED.")
+    #Exit code for CI: 0 = all passed, 1 = something failed (a CI pipeline checks this)
+    sys.exit(0 if passed == len(results) else 1)
 
 
-# Main Program
-#Running "python inventory_manager_oop4.py test" runs the tests instead of the menu
-if len(sys.argv) > 1 and sys.argv[1] == "test":
-    run_tests()
-    sys.exit()
-
-print("=" * 40)
-print("INVENTORY MANAGEMENT SYSTEM")
-print("=" * 40)
-print()
-inventory: Inventory = load_inventory()  #Inventory object holding Product objects
-
-while True:
-    display_menu()
+# Main Program: show the menu and run the chosen option until the user exits
+def main() -> None:
+    print("=" * 40)
+    print("INVENTORY MANAGEMENT SYSTEM")
+    print("=" * 40)
     print()
-    option = input("Enter option: ").strip()
-    print()
+    inventory: Inventory = load_inventory()  #Inventory object holding Product objects
 
-    if option == "1":
-        inventory.display_all()
-    elif option == "2":
-        add_product_menu(inventory)
-    elif option == "3":
-        update_stock_menu(inventory)
-    elif option == "4":
-        search_product_menu(inventory)
-    elif option == "5":
-        remove_product_menu(inventory)
-    elif option == "6":
-        print("Saving inventory...")
-        if save_inventory(inventory):
-            print("Inventory saved successfully to inventory.json.")
-    elif option == "7":
-        #Save automatically before exiting so no changes are lost
-        print("Saving inventory before exit...")
-        if save_inventory(inventory):
-            print("Inventory saved successfully.")
+    while True:
+        display_menu()
         print()
-        print("Thank you for using Inventory Management System.")
-        print("Program terminated.")
-        break
+        option = input("Enter option: ").strip()
+        print()
+
+        if option == "1":
+            inventory.display_all()
+        elif option == "2":
+            add_product_menu(inventory)
+        elif option == "3":
+            update_stock_menu(inventory)
+        elif option == "4":
+            search_product_menu(inventory)
+        elif option == "5":
+            remove_product_menu(inventory)
+        elif option == "6":
+            print("Saving inventory...")
+            if save_inventory(inventory):
+                print("Inventory saved successfully to inventory.json.")
+        elif option == "7":
+            #Save automatically before exiting so no changes are lost
+            print("Saving inventory before exit...")
+            if save_inventory(inventory):
+                print("Inventory saved successfully.")
+            print()
+            print("Thank you for using Inventory Management System.")
+            print("Program terminated.")
+            break
+        else:
+            print("Invalid option! Please choose from the menu.")
+
+
+#Only start the program when this file is RUN, not when it is IMPORTED - so the
+#automated tests in the tests folder can import its functions without the menu starting.
+#Running "python inventory_manager_oop4.py test" runs the built-in tests instead of the menu.
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        run_tests()
     else:
-        print("Invalid option! Please choose from the menu.")
+        main()
